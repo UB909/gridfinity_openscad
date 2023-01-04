@@ -1,8 +1,9 @@
 // include instead of use, so we get the pitch
 include <gridfinity_modules.scad>
 
-xsize = 5;
-ysize = 3;
+xsize = 2;
+xfactor = 1;
+ysize = 2;
 weighted = false;
 lid = false;
 
@@ -13,7 +14,7 @@ else if (weighted) {
   weighted_baseplate(xsize, ysize);
 }
 else {
-  frame_plain(xsize, ysize);
+  frame_plain(xsize, ysize, xfactor=xfactor);
 }
 
 
@@ -66,14 +67,14 @@ module weighted_baseplate(num_x, num_y) {
 }
 
 
-module frame_plain(num_x, num_y, extra_down=0, trim=0) {
+module frame_plain(num_x, num_y, extra_down=0, trim=0, xfactor=1) {
   ht = extra_down > 0 ? 4.4 : 5;
   corner_radius = 3.75;
   corner_position = gridfinity_pitch/2-corner_radius-trim;
   difference() {
-    hull() cornercopy(corner_position, num_x, num_y) 
+    hull() cornercopy(corner_position, num_x * xfactor, num_y) 
     translate([0, 0, -extra_down]) cylinder(r=corner_radius, h=ht+extra_down, $fn=44);
     translate([0, 0, trim ? 0 : -0.01]) 
-    render() gridcopy(num_x, num_y) pad_oversize(margins=1);
+    render() gridcopy(num_x, num_y, xfactor) pad_oversize(margins=1, xfactor=xfactor);
   }
 }

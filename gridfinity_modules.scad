@@ -9,7 +9,7 @@ sharp_corners = 0;
 
 // basic block with cutout in top to be stackable, optional holes in bottom
 // start with this and begin 'carving'
-module grid_block(num_x=1, num_y=1, num_z=2, magnet_diameter=6.5, screw_depth=6, center=false, hole_overhang_remedy=false, half_pitch=false, box_corner_attachments_only = false) {
+module grid_block(num_x=1, num_y=1, num_z=2, magnet_diameter=6.5, screw_depth=6, center=false, hole_overhang_remedy=false, half_pitch=false, box_corner_attachments_only = false, xfactor=1, yfactor=1) {
   corner_radius = 3.75;
   outer_size = gridfinity_pitch - gridfinity_clearance;  // typically 41.5
   block_corner_position = outer_size/2 - corner_radius;  // need not match center of pad corners
@@ -32,23 +32,23 @@ module grid_block(num_x=1, num_y=1, num_z=2, magnet_diameter=6.5, screw_depth=6,
     intersection() {
       union() {
         // logic for constructing odd-size grids of possibly half-pitch pads
-        pad_grid(num_x, num_y, half_pitch);
+        pad_grid(num_x, num_y, half_pitch, xfactor=xfactor, yfactor=yfactor);
         // main body will be cut down afterward
         translate([-gridfinity_pitch/2, -gridfinity_pitch/2, 5]) 
-        cube([gridfinity_pitch*num_x, gridfinity_pitch*num_y, totalht-5]);
+        cube([gridfinity_pitch*num_x*xfactor, gridfinity_pitch*num_y*yfactor, totalht-5]);
       }
       
       // crop with outer cylinders
       translate([0, 0, -0.1])
       hull() 
-      cornercopy(block_corner_position, num_x, num_y) 
+      cornercopy(block_corner_position, num_x*xfactor, num_y*yfactor) 
       cylinder(r=corner_radius, h=totalht+0.2, $fn=32);
     }
     
     // remove top so XxY can fit on top
-      color("blue") 
-      translate([0, 0, gridfinity_zpitch*num_z]) 
-      pad_oversize(num_x, num_y, 1);
+    color("blue") 
+    translate([0, 0, gridfinity_zpitch*num_z]) 
+    pad_oversize(num_x, num_y, 1, xfactor=xfactor, yfactor=yfactor);
     
     if (esd > 0) {  // add pockets for screws if requested
       gridcopycorners(ceil(num_x), ceil(num_y), magnet_position, box_corner_attachments_only)
@@ -72,7 +72,7 @@ module grid_block(num_x=1, num_y=1, num_z=2, magnet_diameter=6.5, screw_depth=6,
 }
 
 
-module pad_grid(num_x, num_y, half_pitch=false) {
+module pad_grid(num_x, num_y, half_pitch=false, xfactor=1, yfactor=1) {
   // if num_x (or num_y) is less than 1 (or less than 0.5 if half_pitch is enabled) then round over the far side
   cut_far_x = (num_x < 1 && !half_pitch) || (num_x < 0.5);
   cut_far_y = (num_y < 1 && !half_pitch) || (num_y < 0.5);
@@ -94,7 +94,7 @@ module pad_grid(num_x, num_y, half_pitch=false) {
   }
   else {
     gridcopy(ceil(num_x), ceil(num_y)) intersection() {
-      pad_oversize();
+      pad_oversize(xfactor=xfactor, yfactor=yfactor);
       if (cut_far_x) {
         translate([gridfinity_pitch*(-1+num_x), 0, 0]) pad_oversize();
       }
@@ -135,7 +135,7 @@ module cylsq2(d1, d2, h) {
 
 // unit pad slightly oversize at the top to be trimmed or joined with other feet or the rest of the model
 // also useful as cutouts for stacking
-module pad_oversize(num_x=1, num_y=1, margins=0) {
+module pad_oversize(num_x=1, num_y=1, margins=0, xfactor=1, yfactor=1) {
   pad_corner_position = gridfinity_pitch/2 - 4; // must be 17 to be compatible
   bevel1_top = 0.8;     // z of top of bottom-most bevel (bottom of bevel is at z=0)
   bevel2_bottom = 2.6;  // z of bottom of second bevel
@@ -149,7 +149,7 @@ module pad_oversize(num_x=1, num_y=1, margins=0) {
   translate([0, 0, -axialdown])
   difference() {
     union() {
-      hull() cornercopy(pad_corner_position, num_x, num_y) {
+      hull() cornercopy(pad_corner_position, num_x*xfactor, num_y*yfactor) {
         if (sharp_corners) {
           cylsq(d=1.6+2*radialgap, h=0.1);
           translate([0, 0, bevel1_top]) cylsq(d=3.2+2*radialgap, h=1.9);
@@ -160,7 +160,7 @@ module pad_oversize(num_x=1, num_y=1, margins=0) {
         }
       }
       
-      hull() cornercopy(pad_corner_position, num_x, num_y) {
+      hull() cornercopy(pad_corner_position, num_x*xfactor, num_y*yfactor) {
         if (sharp_corners) {
           translate([0, 0, bevel2_bottom]) 
           cylsq2(d1=3.2+2*radialgap, d2=7.5+0.5+2*radialgap+2*bonus_ht, h=bevel2_top-bevel2_bottom+bonus_ht);
@@ -175,7 +175,7 @@ module pad_oversize(num_x=1, num_y=1, margins=0) {
     // cut off bottom if we're going to go negative
     if (margins) {
       translate([-gridfinity_pitch/2, -gridfinity_pitch/2, 0])
-      cube([gridfinity_pitch*num_x, gridfinity_pitch*num_y, axialdown]);
+      cube([gridfinity_pitch*num_x*xfactor, gridfinity_pitch*num_y*yfactor, axialdown]);
     }
   }
 }
@@ -201,8 +201,8 @@ module cornercopy(r, num_x=1, num_y=1) {
 
 
 // make repeated copies of something(s) at the gridfinity spacing of 42mm
-module gridcopy(num_x, num_y) {
-  for (xi=[1:num_x]) for (yi=[1:num_y]) translate([gridfinity_pitch*(xi-1), gridfinity_pitch*(yi-1), 0]) children();
+module gridcopy(num_x, num_y, xfactor=1, yfactor=1) {
+  for (xi=[1:num_x]) for (yi=[1:num_y]) translate([xfactor*gridfinity_pitch*(xi-1), yfactor*gridfinity_pitch*(yi-1), 0]) children();
 }
 
 
